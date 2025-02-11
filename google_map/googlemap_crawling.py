@@ -5,294 +5,165 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
 import pandas as pd
 import time
-import os
+import random
 
-class GoogleMapsBatchScraper:
-    def __init__(self, headless=True):
-        # 設定 Chrome 選項
-        self.options = webdriver.ChromeOptions()
-        if headless:
-            self.options.add_argument("--headless")
-        
-        # 添加額外的 Chrome 選項來處理各種問題
-        self.options.add_argument("--disable-gpu")
-        self.options.add_argument("--no-sandbox")
-        self.options.add_argument("--disable-dev-shm-usage")
-        self.options.add_argument("--disable-software-rasterizer")
-        self.options.add_argument('--ignore-gpu-blocklist')
-        self.options.add_argument('--enable-unsafe-swiftshader')
-        self.options.add_argument("--disable-web-security")
-        self.options.add_argument("--allow-running-insecure-content")
-        self.options.add_argument("--disable-blink-features=AutomationControlled")
-        self.options.add_argument('--force-device-scale-factor=1')
-        self.options.add_experimental_option('useAutomationExtension', False)
-        self.options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        
-        # 初始化 WebDriver
+class GoogleMapsScraper:
+    def __init__(self):
+        self.options = self._setup_chrome_options()
         self.service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=self.service, options=self.options)
+        self.wait = WebDriverWait(self.driver, 10)
+        self.processed_reviews = set()
+        self.valid_reviews = []
         
-        # 設定更長的等待時間
-        self.wait = WebDriverWait(self.driver, 20)  # 增加等待時間至 20 秒
-        
-        # 設定視窗大小
-        self.driver.set_window_size(1920, 1080)
-        
-    def load_urls_from_csv(self, csv_files):
-        """從多個 CSV 文件載入 URL"""
-        urls = []
-        for file in csv_files:
-            df = pd.read_csv(file, usecols=["urls"])
-            urls.extend(df['urls'].tolist())
-        return urls
+    def _setup_chrome_options(self):
+        options = webdriver.ChromeOptions()
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        return options
 
-    def open_page(self, url):
-        """打開並初始化頁面"""
+    def click_review_tab(self):
         try:
-            self.driver.get(url)
-            
-            # 等待頁面基本元素載入
-            time.sleep(5)  # 增加初始等待時間
-            
-            # 等待並點擊評論按鈕
-            review_tab = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'button[role="tab"][data-tab-index="1"]'))
-            )
-            
-            # 確保按鈕在可視範圍內
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", review_tab)
-            time.sleep(2)
-            
-            # 使用 JavaScript 點擊
-            self.driver.execute_script("arguments[0].click();", review_tab)
-            
-            # 等待評論區域載入
-            time.sleep(3)
-            
-            return True
-            
-        except Exception as e:
-            print(f"無法載入頁面或找不到評論按鈕: {url}")
-            print(f"錯誤: {str(e)}")
-            return False
-
-    def click_sort_button(self):
-        """點擊排序按鈕"""
-        try:
-            # 等待按鈕出現並可點擊
-            sort_button = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'button[aria-label="排序評論"]'))
-            )
-            
-            # 確保按鈕在可視範圍內
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", sort_button)
-            time.sleep(1)
-            
-            # 使用 JavaScript 點擊
-            self.driver.execute_script("arguments[0].click();", sort_button)
-            time.sleep(2)
-            
-            return True
-        except Exception as e:
-            print(f"點擊排序按鈕時發生錯誤: {str(e)}")
-            return False
-
-    def select_newest_first(self):
-        """選擇最新排序選項"""
-        try:
-            # 等待排序選單出現
-            time.sleep(2)
-            
-            # 使用更精確的選擇器來找到最新選項
-            xpath_options = [
-                # 嘗試通過完整的 class 結構找到元素
-                "//div[contains(@class, 'twHv4e')]/div[contains(@class, 'mLuXec') and contains(text(), '最新')]",
-                # 備選方案：直接找包含最新文字的 div
-                "//div[contains(@class, 'mLuXec') and contains(text(), '最新')]",
-                # 第三種嘗試：通過父元素的特定結構
-                "//div[@role='menuitemradio']//div[contains(text(), '最新')]"
-            ]
-            
-            newest_option = None
-            for xpath in xpath_options:
-                try:
-                    newest_option = self.wait.until(
-                        EC.presence_of_element_located((By.XPATH, xpath))
-                    )
-                    if newest_option:
-                        break
-                except:
-                    continue
-            
-            if not newest_option:
-                print("無法找到最新排序選項")
-                return False
-                
-            # 嘗試將元素滾動到可見區域
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", newest_option)
-            time.sleep(1)
-            
-            # 先嘗試一般的點擊
-            try:
-                newest_option.click()
-            except:
-                # 如果一般點擊失敗，使用 JavaScript 點擊
-                try:
-                    self.driver.execute_script("arguments[0].click();", newest_option)
-                except:
-                    # 如果直接點擊最新選項失敗，嘗試點擊父元素
-                    parent = self.driver.execute_script("return arguments[0].parentNode;", newest_option)
-                    self.driver.execute_script("arguments[0].click();", parent)
-            
-            time.sleep(2)
-            return True
-            
-        except Exception as e:
-            print(f"選擇最新排序時發生錯誤: {str(e)}")
-            return False
-
-    def scroll_reviews(self, target_review_count=20):
-        """滾動載入評論直到達到目標數量"""
-        try:
-            reviews_div = self.wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, 'div.m6QErb.DxyBCb.kA9KIf.dS8AEf')
+            # 等待並點擊評論標籤
+            review_tab = self.wait.until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, 'button[role="tab"][data-tab-index="1"]')
             ))
+            review_tab.click()
+            time.sleep(2)
             
-            max_attempts = 10  # 最大滾動次數
-            current_attempt = 0
+            # 使用 XPath 定位排序按鈕
+            sort_button = self.wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//button[@aria-label='排序評論']")
+            ))
+            self.driver.execute_script("arguments[0].click();", sort_button)
+            time.sleep(1)
             
-            while current_attempt < max_attempts:
-                # 檢查當前評論數量
-                review_elements = self.driver.find_elements(By.CSS_SELECTOR, 'div.jJc9Ad')
-                current_count = len(review_elements)
+            # 選擇最新評論
+            newest_option = self.wait.until(EC.element_to_be_clickable(
+                (By.XPATH, "//div[@role='menuitemradio'][contains(., '最新')]")
+            ))
+            newest_option.click()
+            time.sleep(2)
+            
+        except Exception as e:
+            print(f"點擊排序按鈕時發生錯誤: {e}")
+            self.driver.save_screenshot("error_screenshot.png")
+
+    def scroll_reviews(self, max_scrolls=10):
+        try:
+            # 等待評論容器載入
+            time.sleep(2)
+            
+            # 找到正確的評論容器：div.m6QErb DxyBCb kA9KIf dS8AEf
+            scrollable_div = self.driver.find_element(
+                By.CSS_SELECTOR, 
+                'div.m6QErb.DxyBCb.kA9KIf.dS8AEf'
+            )
+            
+            previous_count = 0
+            for i in range(max_scrolls):
+                # 執行滾動
+                self.driver.execute_script(
+                    'arguments[0].scrollTop = arguments[0].scrollHeight', 
+                    scrollable_div
+                )
                 
-                print(f"已載入 {current_count} 則評論")
+                # 添加隨機等待時間
+                time.sleep(random.uniform(1.5, 2.5))
                 
-                if current_count >= target_review_count:
-                    print("已達到目標評論數量")
+                # 計算當前評論數
+                current_reviews = self.driver.find_elements(By.CSS_SELECTOR, 'div.jftiEf')
+                current_count = len(current_reviews)
+                
+                print(f"已滾動 {i+1} 次，當前評論數: {current_count}")
+                
+                # 檢查是否已到底部
+                if current_count == previous_count:
+                    print(f"滾動完成，共載入 {current_count} 則評論")
                     break
                     
-                # 滾動載入更多評論
-                self.driver.execute_script('arguments[0].scrollTop = arguments[0].scrollHeight', reviews_div)
-                time.sleep(2)
-                current_attempt += 1
+                previous_count = current_count
                 
         except Exception as e:
-            print(f"滾動載入評論時發生錯誤: {str(e)}")
+            print(f"滾動評論時發生錯誤: {e}")
+            self.driver.save_screenshot("scroll_error.png")
 
-    def get_store_name(self):
-        """獲取店家名稱"""
-        try:
-            store_name = self.wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, 'h1.DUwDvf')
-            )).text
-            return store_name
-        except:
-            return "Unknown Store"
-
-    def extract_reviews(self, max_reviews=20):
-        """提取評論內容，限制最大數量"""
-        reviews = []
-        try:
-            review_elements = self.driver.find_elements(By.CSS_SELECTOR, 'div.jJc9Ad')
-            
-            # 只處理指定數量的評論
-            for review in review_elements[:max_reviews]:
-                try:
-                    name = review.find_element(By.CSS_SELECTOR, 'div.d4r55').text
-                    rating = len(review.find_elements(By.CSS_SELECTOR, 'span.kvMYJc img[src*="full_star"]'))
-                    time_element = review.find_element(By.CSS_SELECTOR, 'span.rsqaWe').text
+    def extract_reviews(self, store_name):
+        reviews = self.driver.find_elements(By.CSS_SELECTOR, 'div.jftiEf')
+        print(f"找到 {len(reviews)} 則評論")
+        
+        for review in reviews:
+            try:
+                review_id = review.get_attribute('data-review-id')
+                
+                if review_id not in self.processed_reviews:
+                    # 檢查評論內容
+                    content = review.find_element(By.CSS_SELECTOR, 'span.wiI7pd').text
+                    if not content.strip():
+                        continue
                     
-                    try:
-                        content = review.find_element(By.CSS_SELECTOR, 'span.wiI7pd').text
-                    except:
-                        content = ""
-
-                    reviews.append({
-                        'store_name': self.get_store_name(),
-                        'name': name,
+                    # 提取評分
+                    stars = review.find_elements(By.CSS_SELECTOR, 'span.hCCjke')
+                    rating = sum(1 for star in stars if 'elGi1d' in star.get_attribute('class'))
+                    
+                    print(f"評分: {rating}, 內容: {content[:50]}...")
+                    
+                    self.valid_reviews.append({
+                        'store_name': store_name,
                         'rating': rating,
-                        'time': time_element,
                         'content': content
                     })
-                except Exception as e:
-                    print(f"提取單則評論時發生錯誤: {str(e)}")
-                    continue
                     
+                    self.processed_reviews.add(review_id)
+                    
+            except Exception as e:
+                print(f"提取評論時發生錯誤: {e}")
+                continue
+
+    def scrape_single_location(self, url, store_name):
+        try:
+            print(f"開始處理: {url}")
+            self.driver.get(url)
+            time.sleep(3)  # 等待頁面載入
+            
+            # 點擊評論頁籤和排序
+            self.click_review_tab()
+            
+            # 滾動載入評論
+            self.scroll_reviews()
+            
+            # 提取評論
+            self.extract_reviews(store_name)
+            
+            return self.valid_reviews
+            
         except Exception as e:
-            print(f"提取評論時發生錯誤: {str(e)}")
-            
-        return reviews
+            print(f"發生錯誤: {e}")
+            return []
+        
+        finally:
+            self.driver.quit()
 
-    def save_to_csv(self, reviews, filename='google_maps_reviews.csv'):
-        """將評論保存為 CSV 文件"""
-        if reviews:
-            df = pd.DataFrame(reviews)
+    def save_to_csv(self, filename):
+        if not self.valid_reviews:
+            print("沒有評論資料可供儲存")
+            return
             
-            # 檢查文件是否已存在
-            if os.path.exists(filename):
-                # 如果存在，則附加到現有文件
-                existing_df = pd.read_csv(filename)
-                df = pd.concat([existing_df, df], ignore_index=True)
-            
-            df.to_csv(filename, index=False, encoding='utf-8-sig')
-            print(f"已保存 {len(reviews)} 則評論到 {filename}")
-        else:
-            print("沒有評論可保存")
-
-    def close(self):
-        """關閉瀏覽器"""
-        self.driver.quit()
+        df = pd.DataFrame(self.valid_reviews)
+        df.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"成功儲存 {len(df)} 則評論到 {filename}")
 
 def main():
-    scraper = GoogleMapsBatchScraper(headless=True)
+    # 測試用的單一 URL
+    test_url = "https://www.google.com/maps/place/cama+caf%C3%A9+%E5%8F%B0%E6%9D%B1%E9%90%B5%E8%8A%B1%E6%9D%91%E5%BA%97/@22.7508257,121.1464582,17z/data=!3m1!4b1!4m6!3m5!1s0x346fb92c1196c405:0x449c490d6af4d828!8m2!3d22.7508257!4d121.1490331!16s%2Fg%2F11vbjtbttn?authuser=1&entry=ttu&g_ep=EgoyMDI1MDExNS4wIKXMDSoASAFQAw%3D%3D"  # 替換成你要測試的 Google Maps URL
+    test_store = "測試店家"
     
-    try:
-        # 從 CSV 文件讀取 URL
-        urls = scraper.load_urls_from_csv(['Louisa.csv', 'Cama.csv'])
-        print(f"總共載入 {len(urls)} 個網址")
-        
-        all_reviews = []
-        for i, url in enumerate(urls, 1):
-            print(f"\n處理第 {i}/{len(urls)} 個網址: {url}")
-            
-            # 打開頁面
-            if not scraper.open_page(url):
-                continue
-                
-            # 點擊排序按鈕
-            if not scraper.click_sort_button():
-                continue
-                
-            # 選擇最新排序
-            if not scraper.select_newest_first():
-                continue
-                
-            # 滾動載入評論，目標20則
-            scraper.scroll_reviews(target_review_count=20)
-            
-            # 提取最多20則評論
-            reviews = scraper.extract_reviews(max_reviews=20)
-            if reviews:
-                all_reviews.extend(reviews)
-                
-            # 每處理 5 個網址就保存一次
-            if i % 5 == 0:
-                scraper.save_to_csv(all_reviews, 'coffee_shop_reviews.csv')
-                
-            time.sleep(3)  # 避免請求過於頻繁
-            
-        # 最後保存所有評論
-        scraper.save_to_csv(all_reviews, 'coffee_shop_reviews.csv')
-        
-    except Exception as e:
-        print(f"執行過程中發生錯誤: {str(e)}")
-        
-    finally:
-        scraper.close()
+    scraper = GoogleMapsScraper()
+    reviews = scraper.scrape_single_location(test_url, test_store)
+    scraper.save_to_csv('test_reviews.csv')
 
 if __name__ == "__main__":
     main()
