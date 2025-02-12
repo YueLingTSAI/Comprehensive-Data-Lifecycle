@@ -12,6 +12,15 @@ engine, Base, Session, session, Dcard = init_db()
 load_dotenv()
 
 
+def should_skip_title(title):
+    """檢查標題是否應該被跳過"""
+    skip_patterns = [
+        "的文章搜尋結果",
+        "的搜尋結果",
+    ]
+    return any(pattern in title for pattern in skip_patterns)
+
+
 def check_review_exists(cafe, title, search_date, session):
     """檢查評論是否已存在於資料庫中"""
     existing_review = (
@@ -45,17 +54,17 @@ def search_cafe_reviews(api_key, cx, cafe_keywords, max_requests_per_cafe=25):
         params = {
             "key": api_key,
             "cx": cx,
-            "q": f'site:dcard.tw ({search_query}) (評價 OR 心得) after:2019-01-01',  # 限制 2019 年後的結果
+            "q": f"site:dcard.tw ({search_query}) (評價 OR 心得) after:2019-01-01",  # 限制 2019 年後的結果
             "num": 10,
             "start": start_index,
             "sort": "date",  # 依日期排序
-            "dateRestrict": date_restrict
+            "dateRestrict": date_restrict,
         }
 
         try:
             requests_count += 1
             print(f"正在進行第 {requests_count} 次請求 ({cafe_keywords['name']})")
-            print(f"搜尋 2021  年的評價...")
+            print(f"搜尋 2021 年後的評價...")
 
             response = requests.get(base_url, params=params)
             data = response.json()
@@ -71,9 +80,14 @@ def search_cafe_reviews(api_key, cx, cafe_keywords, max_requests_per_cafe=25):
 
             found_any = False
             for item in data["items"]:
-                text_to_check = (
-                    item.get("title", "") + " " + item.get("snippet", "")
-                ).lower()
+                title = item.get("title", "")
+
+                # 檢查標題是否應該被跳過
+                if should_skip_title(title):
+                    print(f"跳過搜尋結果頁面: {title[:50]}...")
+                    continue
+
+                text_to_check = (title + " " + item.get("snippet", "")).lower()
 
                 if any(
                     keyword.lower() in text_to_check
@@ -84,13 +98,13 @@ def search_cafe_reviews(api_key, cx, cafe_keywords, max_requests_per_cafe=25):
                     # 檢查是否已存在相同評論
                     if not check_review_exists(
                         cafe_keywords["name"],
-                        item.get("title", ""),
+                        title,
                         current_time,
                         session,
                     ):
                         result = {
                             "cafe": cafe_keywords["name"],
-                            "title": item.get("title", ""),
+                            "title": title,
                             "link": item.get("link", ""),
                             "content": item.get("snippet", ""),
                             "source": "Dcard",
@@ -100,7 +114,7 @@ def search_cafe_reviews(api_key, cx, cafe_keywords, max_requests_per_cafe=25):
                         found_any = True
                         print(f"找到新評價: {result['title'][:50]}...")
                     else:
-                        print(f"跳過重複評價: {item.get('title', '')[:50]}...")
+                        print(f"跳過重複評價: {title[:50]}...")
 
             if not found_any:
                 print("本頁未找到相關新評價")
@@ -134,53 +148,23 @@ def main():
                 "CAMA",
                 "Cama",
                 "cama",
-                "CAMA CAFE",
-                "Cama café",
-                "卡瑪",
-                "卡瑪咖啡",
-                "CAMA咖啡",
-                "Cama咖啡",
                 "cama café",
-                "CAMA CAFÉ",
-                "卡馬咖啡",
-                "CAMA coffee",
-                "Cama Coffee",
-                "cama coffee",
-                "卡瑪café",
-                "卡瑪cafe",
+                "cama咖啡",
             ],
         },
         "louisa": {
             "name": "路易莎",
             "variants": [
                 "路易莎",
-                "露易莎",
                 "Louisa",
-                "LOUISA",
-                "Louisa coffee",
-                "路易莎咖啡",
-                "露易莎咖啡",
+                "louisa",
                 "Louisa Coffee",
-                "LOUISA COFFEE",
-                "路易莎咖啡館",
-                "露易莎咖啡館",
-                "Louisa café",
-                "LOUISA CAFÉ",
-                "路易莎 咖啡",
-                "露易莎 咖啡",
-                "Louisa 咖啡",
-                "LouisaCoffee",
-                "louisacoffee",
-                "路易莎coffee",
-                "露易莎coffee",
-                "路易莎café",
-                "露易莎café",
-                "路薩咖啡",  # 常見簡稱
+                "路易莎咖啡",
             ],
         },
     }
 
-    max_requests_per_cafe = 25  # 可以根據需要調整
+    max_requests_per_cafe = 25
     all_reviews = []
     total_requests = 0
 
@@ -197,22 +181,14 @@ def main():
         df = pd.DataFrame(all_reviews)
         df = df.drop_duplicates(subset=["link"])
 
-        # 儲存到資料庫
-        save_to_db(df.to_dict("records"))
+        # 儲存到資料庫並獲取統計資訊
+        success_count, duplicate_count = save_to_db(df.to_dict("records"))
 
         print(f"\n=== 搜尋完成 ===")
         print(f"總共使用 {total_requests} 次 API 請求")
-        print(f"總共找到 {len(df)} 筆不重複評價")
-
-        print("\n各咖啡廳評價數量:")
-        print(df.groupby("cafe")["link"].count())
-
-        print("\n最新 5 筆評價樣本:")
-        sample_reviews = df.head()
-        for _, review in sample_reviews.iterrows():
-            print(f"\n咖啡廳: {review['cafe']}")
-            print(f"標題: {review['title']}")
-            print("-" * 50)
+        print(f"搜尋到的不重複評價: {len(df)} 筆")
+        print(f"成功新增到資料庫: {success_count} 筆")
+        print(f"資料庫中已存在: {duplicate_count} 筆")
     else:
         print("沒有找到任何評價")
 
