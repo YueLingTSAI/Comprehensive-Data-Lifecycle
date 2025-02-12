@@ -45,11 +45,11 @@ def search_cafe_reviews(api_key, cx, cafe_keywords, max_requests_per_cafe=25):
         params = {
             "key": api_key,
             "cx": cx,
-            "q": f"site:dcard.tw ({search_query}) (評價 OR 心得) after:2019-01-01",  # 限制 2019 年後的結果
+            "q": f'site:dcard.tw ({search_query}) (評價 OR 心得) after:2019-01-01',  # 限制 2019 年後的結果
             "num": 10,
             "start": start_index,
             "sort": "date",  # 依日期排序
-            "dateRestrict": date_restrict,
+            "dateRestrict": date_restrict
         }
 
         try:
@@ -128,10 +128,59 @@ def main():
         return
 
     cafe_keywords = {
-        # ... (保持原有的 cafe_keywords 內容不變)
+        "cama": {
+            "name": "CAMA",
+            "variants": [
+                "CAMA",
+                "Cama",
+                "cama",
+                "CAMA CAFE",
+                "Cama café",
+                "卡瑪",
+                "卡瑪咖啡",
+                "CAMA咖啡",
+                "Cama咖啡",
+                "cama café",
+                "CAMA CAFÉ",
+                "卡馬咖啡",
+                "CAMA coffee",
+                "Cama Coffee",
+                "cama coffee",
+                "卡瑪café",
+                "卡瑪cafe",
+            ],
+        },
+        "louisa": {
+            "name": "路易莎",
+            "variants": [
+                "路易莎",
+                "露易莎",
+                "Louisa",
+                "LOUISA",
+                "Louisa coffee",
+                "路易莎咖啡",
+                "露易莎咖啡",
+                "Louisa Coffee",
+                "LOUISA COFFEE",
+                "路易莎咖啡館",
+                "露易莎咖啡館",
+                "Louisa café",
+                "LOUISA CAFÉ",
+                "路易莎 咖啡",
+                "露易莎 咖啡",
+                "Louisa 咖啡",
+                "LouisaCoffee",
+                "louisacoffee",
+                "路易莎coffee",
+                "露易莎coffee",
+                "路易莎café",
+                "露易莎café",
+                "路薩咖啡",  # 常見簡稱
+            ],
+        },
     }
 
-    max_requests_per_cafe = 25
+    max_requests_per_cafe = 25  # 可以根據需要調整
     all_reviews = []
     total_requests = 0
 
@@ -148,15 +197,22 @@ def main():
         df = pd.DataFrame(all_reviews)
         df = df.drop_duplicates(subset=["link"])
 
-        # 儲存到資料庫並獲取統計資訊
-        success_count, duplicate_count = save_to_db(df.to_dict("records"))
+        # 儲存到資料庫
+        save_to_db(df.to_dict("records"))
 
         print(f"\n=== 搜尋完成 ===")
         print(f"總共使用 {total_requests} 次 API 請求")
-        print(f"搜尋到的不重複評價: {len(df)} 筆")
-        print(f"成功新增到資料庫: {success_count} 筆")
-        print(f"資料庫中已存在: {duplicate_count} 筆")
+        print(f"總共找到 {len(df)} 筆不重複評價")
 
+        print("\n各咖啡廳評價數量:")
+        print(df.groupby("cafe")["link"].count())
+
+        print("\n最新 5 筆評價樣本:")
+        sample_reviews = df.head()
+        for _, review in sample_reviews.iterrows():
+            print(f"\n咖啡廳: {review['cafe']}")
+            print(f"標題: {review['title']}")
+            print("-" * 50)
     else:
         print("沒有找到任何評價")
 
