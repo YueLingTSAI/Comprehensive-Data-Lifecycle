@@ -1,6 +1,11 @@
 # 分析檔案
 
-## store_region_mapping.csv：店家地區對照表
+## main code
+```
+google_map_cleaning.py
+```
+
+### store_region_mapping.csv：店家地區對照表
 ```
 shop,region
 澎湖馬公門市,南部
@@ -9,7 +14,7 @@ shop,region
 ...
 ```
 
-## processed_reviews.csv：處理後的評論資料
+### processed_reviews.csv：處理後的評論資料
 ```
 id,brand,store_name,rating,content,content_time,crawling_time,region
 1,Louisa,澎湖馬公門市,5,店員親切...,4 天前,2025-02-14 03:02:17,南部
@@ -17,7 +22,7 @@ id,brand,store_name,rating,content,content_time,crawling_time,region
 ...
 ```
 
-## region_rating_distribution.csv：各地區評分分布
+### region_rating_distribution.csv：各地區評分分布
 ```
 region,rating,count
 北部,1,50     # 代表北部有 50 筆 1 星評價
@@ -29,7 +34,7 @@ region,rating,count
 ...           # 以此類推
 ```
 
-## region_statistics.csv：地區統計資料
+### region_statistics.csv：地區統計資料
 ```
 region,rating_count,rating_mean,rating_min,rating_max
 北部,1050,4.2,1,5    # 代表北部總共有1050筆評價，平均4.2星，最低1星，最高5星
