@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 import pymysql
 import time
 import requests
-import csv
 
 # 設置目標網址
 TARGET_URL = "https://www.foodnext.net/search"
@@ -41,18 +40,6 @@ def connect_to_db():
 # 初始化 MySQL 資料庫
 def setup_database():
     try:
-        conn = pymysql.connect(
-            host="labdb.coded2.fun",
-            user="sophia",
-            password="123456dv107",
-            charset="utf8mb4"
-        )
-        cur = conn.cursor()
-        cur.execute("CREATE DATABASE IF NOT EXISTS SOPHIA")
-        conn.commit()
-        conn.close()
-
-        # 重新連接資料庫
         conn = connect_to_db()
         if not conn:
             print("無法連接到資料庫")
@@ -64,7 +51,7 @@ def setup_database():
             CREATE TABLE IF NOT EXISTS foodnext_cama (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(255),
-                url VARCHAR(255) UNIQUE,  -- 設為 UNIQUE 避免重複插入
+                url VARCHAR(255) UNIQUE,  
                 date VARCHAR(255),
                 content TEXT
             )
@@ -72,7 +59,6 @@ def setup_database():
         conn.commit()
         conn.close()
         print("✅ 資料庫初始化完成")
-
     except pymysql.MySQLError as e:
         print(f"❌ 設定資料庫時發生錯誤: {e}")
 
@@ -81,7 +67,7 @@ def insert_article_data(data):
     conn = connect_to_db()
     if not conn:
         return
-
+    
     cur = conn.cursor()
     try:
         for article in data:
@@ -136,7 +122,7 @@ def get_article_links():
     print(f"📑 找到 {len(article_links)} 篇文章連結")
     return article_links
 
-# 爬取文章內容（使用 requests）
+# 爬取文章內容並過濾延伸閱讀
 def fetch_article_content(article_links):
     article_data = []
 
@@ -150,22 +136,19 @@ def fetch_article_content(article_links):
 
             date_tag = soup.find('p', class_='date')
             if not date_tag:
-                date_tag = soup.find('p', class_='nm')
-                if date_tag:
-                    span_date = date_tag.find('span', class_='date')
-                    date = span_date.text.strip() if span_date else "未找到日期"
-                else:
-                    date = "未找到日期"
+                date_span = soup.select_one('p.nm span.date')
+                date = date_span.get_text(strip=True) if date_span else "未找到日期"
             else:
-                date = date_tag.text.strip()
+                date = date_tag.get_text(strip=True)
 
             content_div = soup.find('div', class_='post-content')
             relevant_paragraphs = []
             if content_div:
                 paragraphs = content_div.find_all('p')
                 for paragraph in paragraphs:
-                    if "cama" in paragraph.text.lower():
-                        relevant_paragraphs.append(paragraph.text.strip())
+                    text = paragraph.text.strip()
+                    if "cama" in text.lower() and "▶" not in text and "延伸閱讀" not in text:
+                        relevant_paragraphs.append(text)
 
             if relevant_paragraphs:
                 article_data.append({
@@ -174,13 +157,13 @@ def fetch_article_content(article_links):
                     "date": date,
                     "relevant_contents": relevant_paragraphs
                 })
-                print(f"📝 找到相關段落於 {link}")
+                print(f"📝 找到相關內容於 {link}")
+                print(f"📅 日期: {date}")
 
         except requests.exceptions.RequestException as e:
             print(f"❌ 爬取 {link} 時發生錯誤: {e}")
 
     return article_data
-
 
 # 主程式
 try:
