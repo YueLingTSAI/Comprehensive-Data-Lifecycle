@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-from g_c_DB import DatabaseConfig
+from google_c_DB import DatabaseConfig
 
 # 定義地區分類
 region_mapping = {
@@ -19,7 +19,7 @@ def get_region(address):
     return '其他'
 
 def create_store_region_mapping(stores_csv1_path, stores_csv2_path, db_config):
-    """處理兩個店家 CSV 檔案，建立店家-地區對照表"""
+    """處理兩個店家 CSV 檔案，建立店家-地區對照表，包含品牌資訊"""
     print("正在處理店家資料...")
     
     # 讀取兩個 CSV 檔案
@@ -35,18 +35,25 @@ def create_store_region_mapping(stores_csv1_path, stores_csv2_path, db_config):
     # 新增地區欄位
     df_stores['region'] = df_stores['address'].apply(get_region)
     
+    # 從資料庫獲取品牌資訊
+    sql_data = db_config.read_table_to_df('google_map', schema='SOPHIA')
+    brand_mapping = sql_data[['store_name', 'brand']].drop_duplicates().set_index('store_name')['brand'].to_dict()
+    
+    # 添加品牌資訊
+    df_stores['brand'] = df_stores['shop'].map(brand_mapping)
+    
     # 建立店家-地區對照字典
     store_region_dict = dict(zip(df_stores['shop'], df_stores['region']))
     
-    # 將結果寫入資料庫
+    # 將結果寫入資料庫，包含品牌資訊
     db_config.write_df_to_table(
-        df_stores[['shop', 'region']], 
-        'store_region_mapping'
+        df_stores[['shop', 'region', 'brand']], 
+        'google_map_store_region'
     )
     
     print(f"共處理了 {len(df_stores)} 家店舖")
     print("地區分布：")
-    print(df_stores.groupby('region')['shop'].count())
+    print(df_stores.groupby(['region', 'brand'])['shop'].count())
     
     return store_region_dict
 
@@ -76,18 +83,27 @@ def process_sql_data(store_region_dict, sql_data, db_config):
     # 新增地區欄位
     sql_data['region'] = sql_data['store_name'].map(store_region_dict)
     
-    # 依照地區和評分進行分組
-    region_rating = sql_data.groupby(['region', 'rating'])['id'].count().reset_index(name='count')
+    # 依照地區、品牌和評分進行分組
+    region_rating = sql_data.groupby(['region', 'brand', 'rating'])['id'].count().reset_index(name='count')
     
-    # 計算各區域統計資料
-    region_stats = sql_data.groupby('region').agg({
+    # 計算各區域統計資料，包含品牌維度
+    region_stats = sql_data.groupby(['region', 'brand']).agg({
         'rating': ['count', 'mean', 'min', 'max']
     }).round(2)
     
+    # 重設索引，使 region 和 brand 變成一般欄位
+    region_stats = region_stats.reset_index()
+    
+    # 重新命名欄位
+    region_stats.columns = [
+        'region', 'brand',
+        'rating_count', 'rating_mean', 'rating_min', 'rating_max'
+    ]
+    
     # 將結果寫入資料庫
-    db_config.write_df_to_table(sql_data, 'processed_reviews_recent')
-    db_config.write_df_to_table(region_rating, 'region_rating_distribution_recent')
-    db_config.write_df_to_table(region_stats, 'region_statistics_recent')
+    db_config.write_df_to_table(sql_data, 'google_map')
+    db_config.write_df_to_table(region_rating, 'google_map_rating_count')
+    db_config.write_df_to_table(region_stats, 'google_map_statistics')
     
     print("\n評分分布：")
     print(region_rating)
