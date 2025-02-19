@@ -9,7 +9,7 @@ import sshtunnel
 from resource.dcard import Dcards
 from resource.foodnext_cama import Foodnext_camas
 from resource.foodnext_louisa import Foodnext_louisas
-from resource.google_map import Google_maps
+from resource.google_map import GoogleMap, GoogleMapRatingCount, GoogleMapStatistics, GoogleMapStoreRegion
 from resource.ptt import Ptts
 from resource.youtube_cama import Youtube_camas
 from resource.youtube_louisa import Youtube_louisas
@@ -33,7 +33,7 @@ api = Api(app)
 
 # DB setting
 app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql://sophia:123456dv107@127.0.0.1:{ssh_tunnel.local_bind_port}/SOPHIA"
+    f"mysql://sophia:123456dv107@127.0.0.1:{ssh_tunnel.local_bind_port}/CLEAN_SOPHIA"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -72,8 +72,14 @@ docs.register(Foodnext_camas)
 api.add_resource(Foodnext_louisas, "/foodnext_louisa/<int:id>")
 docs.register(Foodnext_louisas)
 
-api.add_resource(Google_maps, "/google_map/<int:id>")
-docs.register(Google_maps)
+api.add_resource(GoogleMap, "/google_map")
+api.add_resource(GoogleMapRatingCount, "/GoogleMapRatingCount")
+api.add_resource(GoogleMapStatistics, "/GoogleMapStatistics")
+api.add_resource(GoogleMapStoreRegion, "/GoogleMapStoreRegion")
+docs.register(GoogleMap)
+docs.register(GoogleMapRatingCount)
+docs.register(GoogleMapStatistics)
+docs.register(GoogleMapStoreRegion)
 
 api.add_resource(Ptts, "/ptt/<int:id>")
 docs.register(Ptts)
