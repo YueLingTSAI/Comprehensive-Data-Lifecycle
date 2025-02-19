@@ -1,6 +1,8 @@
 import pandas as pd
 import re
 from datetime import datetime
+from collections import Counter
+import itertools
 
 def read_sql_file(file_path):
     try:
@@ -11,14 +13,10 @@ def read_sql_file(file_path):
         return None
 
 def analyze_comments(sql_content):
-    # 使用正則表達式找出所有 INSERT 語句中的資料（允許匹配中文）
     pattern = r"\((\d+),'(.*?)','(.*?)','(.*?)',(\d+),'(.*?)'\)"
     matches = re.findall(pattern, sql_content)
     
-    # 建立 DataFrame
     df = pd.DataFrame(matches, columns=['id', 'video_id', 'content', 'author', 'likes', 'timestamp'])
-    
-    # 轉換資料類型
     df['id'] = df['id'].astype(int)
     df['likes'] = df['likes'].astype(int)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -31,36 +29,42 @@ def analyze_comments(sql_content):
         text_lower = text.lower()
         if any(keyword.lower() in text_lower for keyword in louisa_keywords):
             return 'Louisa'
-        return None  # Louisa 應該不會被標記為 Cama
+        return None 
     
-    # 過濾政治相關留言
     political_keywords = ['民主', '獨裁', '政黨', '民進黨', '國民黨', '政治', '青鳥', '選舉', '罷免']
     def filter_political_content(text):
         return not any(keyword in text for keyword in political_keywords)
     
     df = df[df['content'].apply(filter_political_content)]
-
-    # 情感分析
-    def analyze_sentiment(text):
-        positive_words = ['好喝', '讚', '推', '棒', '喜歡', '美味', '香', '值得', '專業']
-        negative_words = ['難喝', '糟', '爛', '差', '噁心', '失望', '貴', '雷', '踩雷']
-        
-        pos_count = sum([1 for word in positive_words if word in text])
-        neg_count = sum([1 for word in negative_words if word in text])
-        
-        if pos_count > neg_count:
-            return '正面'
-        elif neg_count > pos_count:
-            return '負面'
-        return '中性'
     
-    # 主題分類
+    def analyze_sentiment(text):
+        positive_words = {'好喝': 3, '讚': 2, '推': 2, '棒': 3, '喜歡': 3, '美味': 4, '香': 2, '值得': 3, '專業': 3, '順口': 2, '回甘': 2, '喜歡': 1, '愛': 2, '很不錯': 1}
+        negative_words = {'難喝': -4, '糟': -3, '爛': -3, '差': -3, '噁心': -4, '失望': -3, '貴': -2, '雷': -3, '踩雷': -4, '淡': -2, '完全不行': -3}
+        
+        pos_score = sum([score for word, score in positive_words.items() if word in text])
+        neg_score = sum([score for word, score in negative_words.items() if word in text])
+        
+        sentiment_score = pos_score + neg_score
+        
+        if sentiment_score > 2:
+            return '強烈正面', sentiment_score
+        elif sentiment_score > 0:
+            return '正面', sentiment_score
+        elif sentiment_score < -2:
+            return '強烈負面', sentiment_score
+        elif sentiment_score < 0:
+            return '負面', sentiment_score
+        return '中性', sentiment_score
+    
     def classify_topic(text):
         topics = {
-            '品質': ['品質', '口感', '味道', '風味', '豆子', '咖啡'],
-            '服務': ['服務', '態度', '店員', '人員', '店長'],
-            '價格': ['價格', '貴', '便宜', '划算', '值得', '便利'],
-            '環境': ['環境', '空間', '座位', '店面', '裝潢', '衛生']
+            '品質': ['品質', '口感', '味道', '風味', '豆子', '咖啡', '回甘', '順口', '濃郁', '淡', '苦', '香醇', '濃縮'],
+            '服務': ['服務', '態度', '店員', '人員', '店長', '熱情', '貼心', '友善', '慢', '不理人', '專業', '耐心', '熱忱'],
+            '價格': ['價格', '貴', '便宜', '划算', '值得', '便利', 'CP值', '優惠', '折扣', '活動', '性價比'],
+            '環境': ['環境', '空間', '座位', '店面', '裝潢', '衛生', '吵雜', '安靜', '燈光', '氣氛', '音樂', '舒適'],
+            '速度': ['等太久', '超快', '出餐慢', '排隊', '等候', '快速', '拖延'],
+            '包裝': ['紙杯', '吸管', '環保', '包裝', '外帶', '設計'],
+            '甜點/餐點': ['可頌', '蛋糕', '司康', '餐點', '甜點', '點心', '麵包', '輕食', '小食']
         }
         
         found_topics = []
@@ -70,44 +74,18 @@ def analyze_comments(sql_content):
         
         return '、'.join(found_topics) if found_topics else '其他'
     
-    # 添加分析欄位
     df['brand'] = df['content'].apply(identify_brand)
     df_filtered = df[df['brand'].notna()].copy()
-    df_filtered['sentiment'] = df_filtered['content'].apply(analyze_sentiment)
+    df_filtered[['sentiment', 'sentiment_score']] = df_filtered['content'].apply(lambda x: pd.Series(analyze_sentiment(x)))
     df_filtered['topic'] = df_filtered['content'].apply(classify_topic)
-    
-    # 移除過短的留言（少於5個字）
     df_filtered = df_filtered[df_filtered['content'].str.len() >= 5]
-    
-    # 結果排序
     df_filtered = df_filtered.sort_values(['brand', 'likes', 'timestamp'], ascending=[True, False, False])
-    
-    # 打印統計資訊
-    print("=== 資料統計 ===")
-    print(f"總評論數: {len(df)}")
-    print(f"相關評論數: {len(df_filtered)}")
-    print("\n品牌分布:")
-    print(df_filtered['brand'].value_counts())
-    print("\n情感分布:")
-    print(df_filtered['sentiment'].value_counts())
-    print("\n主題分布:")
-    print(df_filtered['topic'].value_counts().head())
-    
-    # 顯示高讚數的評論範例
-    print("\n=== 高讚數評論範例（前5則）===")
-    sample_cols = ['brand', 'content', 'sentiment', 'topic', 'likes']
-    print(df_filtered[sample_cols].nlargest(5, 'likes'))
     
     return df_filtered
 
-# **確保 'video_id' 也存入 CSV**
-result_columns = ['id', 'video_id', 'brand', 'content', 'sentiment', 'topic', 'likes', 'timestamp']
-
-# 主程式執行
 if __name__ == "__main__":
-    file_path = "youtube_louisa.sql"  # SQL 檔案路徑
+    file_path = "youtube_louisa.sql"
     sql_content = read_sql_file(file_path)
     if sql_content:
         result_df = analyze_comments(sql_content)
-        # **修正這裡，確保 encoding 適合你的環境**
-        result_df[result_columns].to_csv('analysis_louisa.csv', index=False, encoding='utf-8')
+        result_df.to_csv('analysis_louisa.csv', index=False, encoding='utf-8')
