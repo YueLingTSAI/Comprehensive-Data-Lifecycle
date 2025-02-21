@@ -3,9 +3,11 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
+from datetime import datetime
 import pymysql
 import time
 import requests
+import re
 
 # 設置目標網址
 TARGET_URL = "https://www.foodnext.net/search"
@@ -21,6 +23,35 @@ options.add_argument("--remote-debugging-port=9222")
 # 啟動 WebDriver
 service = Service()
 driver = webdriver.Chrome(service=service, options=options)
+
+# 定義分類規則
+CLASSIFICATION_RULES = {
+    "產品相關類": r"新品|推出|升級|新口感|全新|情人節|新上市",
+    "行銷活動類": r"優惠|折扣|促銷|回饋|特價|半價|買一送一|限時|會員|送禮|禮盒|預購|聯名|合作|feat|聯合|攜手|異業結盟|策略聯盟|跨界",
+    "品牌發展類": r"展店|加盟|拓點|新店|旗艦店|門市|分店|據點|開設|進駐|擴展|投資|併購|IPO|上市|櫃|股東|股價|公開發行",
+    "市場趨勢類": r"市場|產業趨勢|市佔率|商機|成長|趨勢|未來展望|策略|品牌形象|消費行為|市場研究|評鑑|品牌競爭|品牌選擇",
+    "品牌類": r"星巴克|伯朗|西雅圖|超商|成真咖啡|黑沃咖啡|Flash Coffee|怡客咖啡",
+}
+
+# 自動分類函數
+def classify_article(title, content):
+    for category, pattern in CLASSIFICATION_RULES.items():
+        if re.search(pattern, title, re.IGNORECASE) or re.search(pattern, content, re.IGNORECASE):
+            return category
+    return "未分類"
+
+# 轉換日期格式
+def format_date(date_str):
+    """自動偵測並轉換 `YYYY/MM/DD` 和 `YYYY-MM-DD` 格式"""
+    try:
+        if "/" in date_str:  # `2025/01/11`
+            return datetime.strptime(date_str, "%Y/%m/%d").strftime("%Y-%m-%d")
+        elif "-" in date_str:  # `2025-01-11`
+            return datetime.strptime(date_str, "%Y-%m-%d").strftime("%Y-%m-%d")
+        else:
+            return None  # 不是預期格式時返回 None
+    except ValueError:
+        return None
 
 # MySQL 連線函式
 def connect_to_db():
@@ -52,8 +83,9 @@ def setup_database():
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(255),
                 url VARCHAR(255) UNIQUE,  
-                date VARCHAR(255),
-                content TEXT
+                date DATE,
+                content TEXT,
+                classified VARCHAR(50)
             )
         """)
         conn.commit()
@@ -71,19 +103,26 @@ def insert_article_data(data):
     cur = conn.cursor()
     try:
         for article in data:
+            classified = classify_article(article['title'], " ".join(article['relevant_contents']))
+            formatted_date = format_date(article['date'])
+            if formatted_date is None:
+                print(f"⚠️ 日期格式錯誤: {article['date']}，跳過此文章")
+                continue
             sql = """
-                INSERT INTO foodnext_cama (title, url, date, content)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO foodnext_cama (title, url, date, content, classified)
+                VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                 title = VALUES(title),
                 date = VALUES(date),
-                content = VALUES(content)
+                content = VALUES(content),
+                classified = VALUES(classified)
             """
             cur.execute(sql, (
                 article['title'],
                 article['url'],
-                article['date'],
-                "\n".join(article['relevant_contents'])
+                formatted_date,
+                "\n".join(article['relevant_contents']),
+                classified
             ))
         conn.commit()
         print(f"✅ 成功插入或更新 {len(data)} 篇文章至資料庫")
@@ -122,6 +161,19 @@ def get_article_links():
     print(f"📑 找到 {len(article_links)} 篇文章連結")
     return article_links
 
+def clean_content(text):
+    # 定義過濾的正則表達式
+    patterns = [
+        r'（?圖片來源[：:＝][^）]*）?',  # 匹配 (圖片來源：XXX) 或 圖片來源：XXX
+        r'（?內容提供[：:＝][^）]*）?'  # 匹配 (內容提供：XXX) 或 內容提供：XXX
+    ]
+    
+    for pattern in patterns:
+        text = re.sub(pattern, '', text).strip()  # 使用正則表達式刪除匹配的內容
+
+    return text
+
+
 # 爬取文章內容並過濾延伸閱讀
 def fetch_article_content(article_links):
     article_data = []
@@ -141,12 +193,18 @@ def fetch_article_content(article_links):
             else:
                 date = date_tag.get_text(strip=True)
 
+            formatted_date = format_date(date) if date else None
+            if formatted_date is None:
+                print(f"⚠️ 日期格式錯誤: {date}，跳過此文章")
+                continue  # 直接跳過這篇文章
+
             content_div = soup.find('div', class_='post-content')
             relevant_paragraphs = []
             if content_div:
                 paragraphs = content_div.find_all('p')
                 for paragraph in paragraphs:
                     text = paragraph.text.strip()
+                    text = clean_content(text)
                     if "cama" in text.lower() and "▶" not in text and "延伸閱讀" not in text:
                         relevant_paragraphs.append(text)
 
@@ -154,7 +212,7 @@ def fetch_article_content(article_links):
                 article_data.append({
                     "url": link,
                     "title": title,
-                    "date": date,
+                    "date": formatted_date,
                     "relevant_contents": relevant_paragraphs
                 })
                 print(f"📝 找到相關內容於 {link}")
