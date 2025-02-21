@@ -7,12 +7,10 @@ from model import db
 import sshtunnel
 
 from resource.dcard import Dcards
-from resource.foodnext_cama import Foodnext_camas
-from resource.foodnext_louisa import Foodnext_louisas
-from resource.google_map import GoogleMap, GoogleMapRatingCount, GoogleMapStatistics, GoogleMapStoreRegion
+from resource.foodnext import Foodnext_camas, Foodnext_louisas
+from resource.google_map import GoogleMaps, GoogleMapRatingCount, GoogleMapStatistics, GoogleMapStoreRegion
 from resource.ptt import Ptts
-from resource.youtube_cama import Youtube_camas
-from resource.youtube_louisa import Youtube_louisas
+from resource.youtube import Youtube_camas, Youtube_louisas
 
 # SSH tunnel configuration
 ssh_tunnel = sshtunnel.SSHTunnelForwarder(
@@ -63,31 +61,29 @@ app.config.update(
 docs = FlaskApiSpec(app)
 
 # Route
-api.add_resource(Dcards, "/dcard/<int:id>")
+api.add_resource(Dcards, "/dcard")
 docs.register(Dcards)
 
-api.add_resource(Foodnext_camas, "/foodnext_cama/<int:id>")
-docs.register(Foodnext_camas)
+api.add_resource(Ptts, "/ptt")
+docs.register(Ptts)
 
-api.add_resource(Foodnext_louisas, "/foodnext_louisa/<int:id>")
+api.add_resource(Foodnext_camas, "/foodnext_cama")
+api.add_resource(Foodnext_louisas, "/foodnext_louisa")
+docs.register(Foodnext_camas)
 docs.register(Foodnext_louisas)
 
-api.add_resource(GoogleMap, "/google_map")
+api.add_resource(GoogleMaps, "/google_map")
 api.add_resource(GoogleMapRatingCount, "/GoogleMapRatingCount")
 api.add_resource(GoogleMapStatistics, "/GoogleMapStatistics")
 api.add_resource(GoogleMapStoreRegion, "/GoogleMapStoreRegion")
-docs.register(GoogleMap)
+docs.register(GoogleMaps)
 docs.register(GoogleMapRatingCount)
 docs.register(GoogleMapStatistics)
 docs.register(GoogleMapStoreRegion)
 
-api.add_resource(Ptts, "/ptt/<int:id>")
-docs.register(Ptts)
-
-api.add_resource(Youtube_camas, "/youtube_cama/<int:id>")
+api.add_resource(Youtube_camas, "/youtube_cama")
+api.add_resource(Youtube_louisas, "/youtube_louisa")
 docs.register(Youtube_camas)
-
-api.add_resource(Youtube_louisas, "/youtube_louisa/<int:id>")
 docs.register(Youtube_louisas)
 
 if __name__ == "__main__":

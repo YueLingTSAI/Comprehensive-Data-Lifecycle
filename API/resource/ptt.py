@@ -1,4 +1,4 @@
-from flask_apispec import MethodResource, marshal_with, doc
+from flask_apispec import MethodResource, marshal_with, doc, use_kwargs
 import util
 from . import ptt_route_model
 from model import Ptt
@@ -7,23 +7,34 @@ from model import Ptt
 
 
 class Ptts(MethodResource):
-    # Get single by id
-    @doc(description="Get Single Users info.", tags=["Ptt"])
-    @marshal_with(ptt_route_model.PttSingleGetResponse, code=200)
-    def get(self, id):
-        ptt = Ptt.query.filter_by(id=id).first()
-        if ptt is None:  # 錯誤處理
-            return util.failure({"message": "Ptt not found"})
-
-        ptt_info = {
-            "id": ptt.id,
-            "keyword": ptt.keyword,
-            "article_title": ptt.article_title,
-            "content_text": ptt.content_text,
-            "content_type": ptt.content_type,
-            "post_time": ptt.post_time,
-            "crawl_time": ptt.crawl_time,
-            "article_url": ptt.article_url,
-            "comment_author": ptt.comment_author,
-        }
-        return util.success(ptt_info)
+    @doc(description="根據關鍵字搜尋 Ptt 內容", tags=["Ptt"])
+    @use_kwargs(ptt_route_model.PttFilterRequest, location=('query'))
+    @marshal_with(ptt_route_model.PttResponse, code=200)
+    def get(self, **kwargs):
+        # 獲取關鍵字參數
+        keyword = kwargs.get('keyword')
+        
+        # 建立查詢
+        query = Ptt.query
+        
+        # 如果提供了關鍵字，進行內容搜尋
+        if keyword:
+            query = query.filter(Ptt.content_text.contains(keyword))
+            
+        # 執行查詢
+        results = query.all()
+        
+        if not results:
+            return util.failure({"message": "無符合條件的資料"})
+            
+        # 格式化結果，只返回需要的欄位
+        data = []
+        for item in results:
+            data.append({
+                "id": item.id,
+                "content_text": item.content_text,
+                "board": item.board,
+                "content_type": item.content_type
+            })
+            
+        return util.success(data)

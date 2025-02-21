@@ -3,7 +3,10 @@ import util
 from . import google_map_route_model
 from model import Google_map1, Google_map2, Google_map3, Google_map4
 
-class GoogleMap(MethodResource):
+####### API Action #########
+
+
+class GoogleMaps(MethodResource):
     @doc(description="獲取 Google Map 評論資料，可依品牌、地區和評分進行篩選", tags=["Google_map"])
     @use_kwargs(google_map_route_model.GoogleMapFilterRequest, location=('query'))
     @marshal_with(google_map_route_model.GoogleMapResponse, code=200)
