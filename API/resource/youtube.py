@@ -34,6 +34,7 @@ class Youtube_camas(MethodResource):
                 "id": item.id,
                 "content": item.content,
                 "created_at": item.created_at,
+                "sentiment_score": item.sentiment_score,
                 "video_id": item.video_id
             })
             
@@ -67,6 +68,7 @@ class Youtube_louisas(MethodResource):
                 "id": item.id,
                 "content": item.content,
                 "created_at": item.created_at,
+                "sentiment_score": item.sentiment_score,
                 "video_id": item.video_id
             })
             
