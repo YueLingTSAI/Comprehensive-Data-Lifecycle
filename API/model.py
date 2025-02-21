@@ -187,6 +187,11 @@ class Ptt(db.Model):
     crawl_time = Column(DATETIME, nullable=True)
     article_url = Column(VARCHAR(255), nullable=True)
     comment_author = Column(VARCHAR(255), nullable=True)
+    board = Column(VARCHAR(20), nullable=True)
+    sentiment = Column(VARCHAR(20), nullable=True)
+    sentiment_score = Column(Integer, nullable=True)
+    topic = Column(VARCHAR(500), nullable=True)
+
 
     __table_args__ = {
         'mysql_engine': 'InnoDB',

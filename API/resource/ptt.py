@@ -14,13 +14,9 @@ class Ptts(MethodResource):
         # 獲取關鍵字參數
         keyword = kwargs.get('keyword')
         
-        # 建立查詢
-        query = Ptt.query
-        
-        # 如果提供了關鍵字，進行內容搜尋
-        if keyword:
-            query = query.filter(Ptt.content_text.contains(keyword))
-            
+        # 建立基礎查詢
+        query = Ptt.query.filter_by(keyword=keyword)
+
         # 執行查詢
         results = query.all()
         
