@@ -5,9 +5,9 @@ from sqlalchemy.exc import IntegrityError
 from typing import List, Dict, Tuple
 
 def init_db():
-    # 直接連接到 SOPHIA 資料庫
+    # 直接連接到 指定 資料庫
     engine = create_engine(
-        "mysql+pymysql://sophia:123456dv107@labdb.coded2.fun:3306/SOPHIA"
+        "mysql+pymysql://你的資料庫帳號:你的資料庫密碼@你的資料庫IP:3306/你的資料庫名稱"
     )
     Base = declarative_base()
 

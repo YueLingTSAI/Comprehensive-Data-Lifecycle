@@ -11,12 +11,12 @@ BATCH_SIZE = 100   # 批量處理的記錄數量
 
 # 設定 GCP 認證
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "/home/joelle/ptt/analysis/config/gcp_key.json"
+    "/home/請替換你自己的檔案路徑/ptt/analysis/config/gcp_key.json"
 )
 
-# 設定日誌
+# 設定日誌(非必要)
 logging.basicConfig(
-    filename="/home/joelle/ptt/analysis/logs/analysis.log",
+    filename="/home/請替換你自己的檔案路徑/ptt/analysis/logs/analysis.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
@@ -24,7 +24,7 @@ logging.basicConfig(
 # 在 main.py 最開始加入測試代碼
 def test_db_connection():
     try:
-        db_handler = DatabaseHandler('/home/joelle/ptt/analysis/config/database.ini')
+        db_handler = DatabaseHandler('/home/請替換為你自己的檔案路徑/ptt/analysis/config/database.ini')
         conn = db_handler.get_connection()
         if conn.is_connected():
             print("資料庫連接正常")
@@ -42,7 +42,7 @@ test_db_connection()
 def main():
     start_time = time.time()
     try:
-        db_handler = DatabaseHandler('/home/joelle/ptt/analysis/config/database.ini')
+        db_handler = DatabaseHandler('/home/請替換為你自己的檔案路徑/ptt/analysis/config/database.ini')
         vectorizer = TextVectorizer()
 
         # 新增需要的欄位

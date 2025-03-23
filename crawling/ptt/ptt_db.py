@@ -4,10 +4,10 @@ from typing import Optional
 
 # 資料庫連線設定
 DATABASE_CONFIG = {
-    "user": "sophia",
-    "password": "123456dv107",
-    "host": "labdb.coded2.fun",
-    "database": "SOPHIA",
+    "user": "請填入你的資料庫帳號",
+    "password": "請填入你的資料庫密碼",
+    "host": "請填入你的資料庫主機IP",
+    "database": "請填入你的資料庫名稱",
 }
 
 

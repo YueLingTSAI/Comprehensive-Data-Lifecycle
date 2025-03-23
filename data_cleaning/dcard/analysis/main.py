@@ -9,12 +9,12 @@ TEST_RECORDS = 5  # 測試模式時要處理的筆數
 
 # 設定 GCP 認證
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "/home/joelle/dcard/analysis/config/gcp_key.json"
+    "/home/請替換你自己的檔案路徑/dcard/analysis/config/gcp_key.json"
 )
 
-# 設定日誌
+# 設定日誌(非必要)
 logging.basicConfig(
-    filename="/home/joelle/dcard/analysis/logs/analysis.log",
+    filename="/home/請替換你自己的檔案路徑/dcard/analysis/logs/analysis.log",
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
@@ -22,7 +22,7 @@ logging.basicConfig(
 
 def main():
     try:
-        db_handler = DatabaseHandler("/home/joelle/dcard/analysis/config/database.ini")
+        db_handler = DatabaseHandler("/home/請替換你自己的檔案路徑/dcard/analysis/config/database.ini")
         analyzer = ContentAnalyzer()
 
         # 新增需要的欄位
