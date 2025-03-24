@@ -57,10 +57,10 @@ def format_date(date_str):
 def connect_to_db():
     try:
         conn = pymysql.connect(
-            host="labdb.coded2.fun",
-            user="sophia",
-            password="123456dv107",
-            db="SOPHIA",
+            host="請填入你的資料庫主機IP",
+            user="請填入你的資料庫帳號",
+            password="請填入你的資料庫密碼",
+            db="請填入你的資料庫名稱",
             charset="utf8mb4"
         )
         return conn
