@@ -30,7 +30,7 @@ def get_next_api_key():
 
 def init_db():
     """確保資料庫 `SOPHIA` 存在，並確保 `youtube_louisa` 和 `youtube_cama` 資料表存在"""
-    engine = create_engine("mysql+pymysql://sophia:123456dv107@labdb.coded2.fun:3306/", pool_pre_ping=True)
+    engine = create_engine("mysql+pymysql://你的資料庫帳號:你的資料庫密碼@你的資料庫IP:3306/你的資料庫名稱", pool_pre_ping=True)
     connection = engine.connect()
 
     # ✅ 使用 `text()` 來確保 SQLAlchemy 可執行 SQL
@@ -39,7 +39,7 @@ def init_db():
     connection.close()
 
     # **重新連接至 SOPHIA 資料庫**
-    engine = create_engine("mysql+pymysql://sophia:123456dv107@labdb.coded2.fun:3306/SOPHIA", pool_pre_ping=True)
+    engine = create_engine("mysql+pymysql://你的資料庫帳號:你的資料庫密碼@你的資料庫IP:3306/你的資料庫名稱", pool_pre_ping=True)
     Base = declarative_base()
 
     class Louisa(Base):
