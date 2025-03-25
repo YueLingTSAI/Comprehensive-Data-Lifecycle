@@ -1,15 +1,17 @@
 import mysql.connector
 import pandas as pd
 from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
 
 class DatabaseConfig:
     def __init__(self):
         # MariaDB 連接設定
-        self.host = 'labdb.coded2.fun'  # 資料庫主機
-        self.port = 3306         # 預設端口
-        self.database = 'SOPHIA'
-        self.username = 'sophia'
-        self.password = '123456dv107'
+        self.host = os.getenv("DB_HOST")
+        self.port = 3306
+        self.database = os.getenv("DB_NAME")
+        self.username = os.getenv("DB_USER")
+        self.password = os.getenv("DB_PASSWORD")
     
     def get_connection(self):
         """建立資料庫連接"""

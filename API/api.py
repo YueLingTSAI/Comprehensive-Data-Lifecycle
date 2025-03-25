@@ -5,6 +5,8 @@ from flask_apispec.extension import FlaskApiSpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from model import db
 import sshtunnel
+from dotenv import load_dotenv
+import os
 
 from resource.dcard import Dcards
 from resource.foodnext import Foodnext_camas, Foodnext_louisas
@@ -12,12 +14,17 @@ from resource.google_map import GoogleMaps, GoogleMapRatingCount, GoogleMapStati
 from resource.ptt import Ptts
 from resource.youtube import Youtube_camas, Youtube_louisas
 
+c_host=os.getenv("C_HOST"),
+c_user=os.getenv("C_USER"),
+c_password=os.getenv("C_PASSWORD"),
+db_host=os.getenv("DB_HOST")
+
 # SSH tunnel configuration
 ssh_tunnel = sshtunnel.SSHTunnelForwarder(
-    ('dv107.coded2.fun', 8022),  # 跳板機位址
-    ssh_username='joelle',
-    ssh_password='123456',  # 或使用 ssh_pkey='密鑰檔案路徑'
-    remote_bind_address=('labdb.coded2.fun', 3306)  # 目標資料庫伺服器和埠口
+    (c_host, 8022),  
+    ssh_username=c_user,
+    ssh_password=c_password,
+    remote_bind_address=(db_host, 3306)  # 目標資料庫伺服器和埠口
 )
 
 # 啟動 SSH 隧道

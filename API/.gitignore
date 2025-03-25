@@ -1,0 +1,8 @@
+# 環境變數檔案
+.env
+__pycache__/
+alembic/
+
+resource/__pycache__/
+
+alembic.ini
